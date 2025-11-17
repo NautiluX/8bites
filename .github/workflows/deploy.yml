@@ -32,7 +32,7 @@ jobs:
 
       - name: Copy wasm_exec.js
         # This file is essential for running the WebAssembly module in the browser.
-        run: cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" dist/
+        run: cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" dist/
 
       - name: Create index.html (Web Page Entry Point)
         # This HTML file sets up the WebAssembly environment and loads the game.
