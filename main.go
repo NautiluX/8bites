@@ -107,28 +107,30 @@ func (g *Game) GetRandomFloorPosition() (int, int) {
 // enforcing screen boundaries.
 func (g *Game) handleInputAndMovement() {
 	// Handle Up/W
-	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.playerSprite.CurrentVy = -playerSpeed
-		g.playerSprite.CurrentVx = 0
-		g.playerSprite.SetAnimation("up")
-	}
-	// Handle Down/S
-	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.playerSprite.CurrentVy = playerSpeed
-		g.playerSprite.CurrentVx = 0
-		g.playerSprite.SetAnimation("down")
-	}
-	// Handle Left/A
-	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.playerSprite.CurrentVx = -playerSpeed
-		g.playerSprite.CurrentVy = 0
-		g.playerSprite.SetAnimation("left")
-	}
-	// Handle Right/D
-	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.playerSprite.CurrentVx = playerSpeed
-		g.playerSprite.CurrentVy = 0
-		g.playerSprite.SetAnimation("right")
+	if g.playerSprite.Y%32 == 0 && g.playerSprite.X%32 == 0 {
+		if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
+			g.playerSprite.CurrentVy = -playerSpeed
+			g.playerSprite.CurrentVx = 0
+			g.playerSprite.SetAnimation("up")
+		}
+		// Handle Down/S
+		if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
+			g.playerSprite.CurrentVy = playerSpeed
+			g.playerSprite.CurrentVx = 0
+			g.playerSprite.SetAnimation("down")
+		}
+		// Handle Left/A
+		if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+			g.playerSprite.CurrentVx = -playerSpeed
+			g.playerSprite.CurrentVy = 0
+			g.playerSprite.SetAnimation("left")
+		}
+		// Handle Right/D
+		if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+			g.playerSprite.CurrentVx = playerSpeed
+			g.playerSprite.CurrentVy = 0
+			g.playerSprite.SetAnimation("right")
+		}
 	}
 
 	// Random movement for slime. 50% chance to change direction each update
@@ -141,7 +143,6 @@ func (g *Game) handleInputAndMovement() {
 		g.slimeSprite.CurrentVx = 0
 		g.slimeSprite.CurrentVy = -1 + rand.IntN(3)
 	}
-	log.Printf("Slime Vx: %d, Vy: %d", g.slimeSprite.CurrentVx, g.slimeSprite.CurrentVy)
 
 	if !g.checkWallCollision(g.slimeSprite) {
 		g.slimeSprite.Move(screenWidth, screenHeight)
