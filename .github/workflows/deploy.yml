@@ -1,0 +1,89 @@
+name: Ebiten WebAssembly Deploy
+
+on:
+  push:
+    branches:
+      - main # Trigger the workflow when changes are pushed to the 'main' branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    # Permissions required for fetching the repository content and deploying to GitHub Pages
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22' # Use a recent stable Go version
+
+      - name: Create Distribution Directory
+        run: mkdir dist
+
+      - name: Build WebAssembly Binary
+        run: GOOS=js GOARCH=wasm go build -o dist/main.wasm .
+
+      - name: Copy wasm_exec.js
+        # This file is essential for running the WebAssembly module in the browser.
+        run: cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" dist/
+
+      - name: Create index.html (Web Page Entry Point)
+        # This HTML file sets up the WebAssembly environment and loads the game.
+        run: |
+          cat > dist/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="utf-8">
+              <title>Ebiten Game</title>
+              <style>
+                  body { margin: 0; background-color: #000; overflow: hidden; }
+                  canvas { display: block; margin: auto; }
+              </style>
+          </head>
+          <body>
+              <script src="wasm_exec.js"></script>
+              <script>
+                  if (!WebAssembly.instantiateStreaming) {
+                      WebAssembly.instantiateStreaming = async (resp, importObject) => {
+                          const source = await resp.arrayBuffer();
+                          return await WebAssembly.instantiate(source, importObject);
+                      };
+                  }
+
+                  const go = new Go();
+                  let mod, inst;
+
+                  async function loadGame() {
+                      // Fetch the WebAssembly binary
+                      const response = await fetch("main.wasm");
+
+                      // Instantiate the Wasm module
+                      const result = await WebAssembly.instantiateStreaming(response, go.importObject);
+                      mod = result.module;
+                      inst = result.instance;
+
+                      // Start the Go program
+                      go.run(inst);
+                  }
+
+                  loadGame();
+              </script>
+              <!-- Ebiten renders the game onto a canvas element. -->
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages # The branch to deploy to
