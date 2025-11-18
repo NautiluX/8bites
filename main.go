@@ -1,15 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"image"
+	"image/color"
 	_ "image/png"
 	"log"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/NautiluX/8bites/assets"
 	"github.com/NautiluX/8bites/pkg/sprites"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -24,73 +31,43 @@ type Game struct {
 	bgImage      *ebiten.Image
 	playerSprite *sprites.CharacterSprite
 	slimeSprite  *sprites.CharacterSprite
+	bite         *sprites.CharacterSprite
 	mapTiles     [mapHeight][mapWidth]int
 	wallTile     *ebiten.Image
 	floorTile    *ebiten.Image
+	title        GameTitle
+	Ended        bool
 }
 
-var theGame *Game
+type GameTitle struct {
+	Visible       bool
+	Duration      time.Duration
+	StartTime     time.Time
+	LastShakeTime time.Time
+	WordsVisible  int
+	ShakeX        int
+	ShakeY        int
+	Text          string
+}
+
+var (
+	theGame *Game
+	font    *text.GoTextFaceSource
+)
 
 // init loads the assets before the game starts.
 func init() {
-	playerImg, err := assets.GetPlayerYellowSprite()
-	if err != nil {
-		log.Fatalf("Failed to load player sprite: %v", err)
-	}
-	playerSprite := sprites.NewCharacterSprite(playerImg, 32, 32, []sprites.Animation{
-		{Name: "right", Frames: 12},
-		{Name: "left", Frames: 12},
-		{Name: "up", Frames: 12},
-		{Name: "down", Frames: 12},
-	})
-
-	slimeImg, err := assets.GetSlimeSprite()
-	if err != nil {
-		log.Fatalf("Failed to load player sprite: %v", err)
-	}
-	slimeSprite := sprites.NewCharacterSprite(slimeImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 10},
-	})
-
-	wallTile, err := assets.GetWallTileImage()
-	if err != nil {
-		log.Fatalf("Failed to load wall tile image: %v", err)
-	}
-
-	floorTile, err := assets.GetFloorTileImage()
-	if err != nil {
-		log.Fatalf("Failed to load floor tile image: %v", err)
-	}
 	// Initialize the game struct (Global access for simplicity)
-	theGame = &Game{
-		bgImage:      nil,
-		playerSprite: playerSprite,
-		slimeSprite:  slimeSprite,
-		mapTiles: [mapHeight][mapWidth]int{
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1},
-			{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-			{1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
-			{1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
-			{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1},
-			{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1},
-			{1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1},
-			{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1},
-			{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		},
-		wallTile:  wallTile,
-		floorTile: floorTile,
+	theGame = &Game{}
+	err := ResetGame()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition()
-	//select random tile to spawn slime
-	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition()
-
+	font, err = text.NewGoTextFaceSource(bytes.NewReader(fonts.PressStart2P_ttf))
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (g *Game) GetRandomFloorPosition() (int, int) {
@@ -152,6 +129,24 @@ func (g *Game) handleInputAndMovement() {
 	}
 }
 
+func (g *Game) checkGameEnd() {
+	// Check for collision between player and slime
+	playerRect := ebiten.NewImage(g.playerSprite.Width, g.playerSprite.Height).Bounds()
+	playerRect = playerRect.Add(image.Point{X: g.playerSprite.X, Y: g.playerSprite.Y})
+
+	slimeRect := ebiten.NewImage(g.slimeSprite.Width, g.slimeSprite.Height).Bounds()
+	slimeRect = slimeRect.Add(image.Point{X: g.slimeSprite.X, Y: g.slimeSprite.Y})
+
+	if playerRect.Overlaps(slimeRect) {
+		// Show title
+		g.title.Visible = true
+		g.title.StartTime = time.Now()
+		g.title.WordsVisible = 0
+		g.title.Text = "GAME OVER!"
+		g.Ended = true
+	}
+}
+
 func (g *Game) checkWallCollision(s *sprites.CharacterSprite) bool {
 	// figure out if the current movement would result in a collision with a wal.
 	// we take the sprites current position width and height into account.
@@ -181,14 +176,13 @@ func (g *Game) checkWallCollision(s *sprites.CharacterSprite) bool {
 func (g *Game) animate() {
 	g.playerSprite.Animate()
 	g.slimeSprite.Animate()
+	g.bite.Animate()
 }
 
 var lastAnimationUpdate time.Time
 
 // Update handles the game logic, primarily input and state changes.
 func (g *Game) Update() error {
-	// Call the separate function for handling movement
-	g.handleInputAndMovement()
 
 	if time.Since(lastAnimationUpdate) > 100*time.Millisecond {
 		lastAnimationUpdate = time.Now()
@@ -200,6 +194,97 @@ func (g *Game) Update() error {
 		return ebiten.Termination
 	}
 
+	if g.Ended {
+		if ebiten.IsKeyPressed(ebiten.KeyR) {
+			err := ResetGame()
+			if err != nil {
+				log.Fatalf("Failed to reset game: %v", err)
+			}
+		}
+		return nil
+	}
+	g.checkGameEnd()
+
+	g.handleInputAndMovement()
+
+	return nil
+}
+func ResetGame() error {
+	playerImg, err := assets.GetPlayerYellowSprite()
+	if err != nil {
+		log.Fatalf("failed to load player sprite: %v", err)
+	}
+	playerSprite := sprites.NewCharacterSprite(playerImg, 32, 32, []sprites.Animation{
+		{Name: "right", Frames: 12},
+		{Name: "left", Frames: 12},
+		{Name: "up", Frames: 12},
+		{Name: "down", Frames: 12},
+	})
+
+	slimeImg, err := assets.GetSlimeSprite()
+	if err != nil {
+		return fmt.Errorf("failed to load player sprite: %w", err)
+	}
+	slimeSprite := sprites.NewCharacterSprite(slimeImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 10},
+	})
+
+	wallTile, err := assets.GetWallTileImage()
+	if err != nil {
+		return fmt.Errorf("failed to load wall tile image: %w", err)
+	}
+
+	floorTile, err := assets.GetFloorTileImage()
+	if err != nil {
+		return fmt.Errorf("failed to load floor tile image: %w", err)
+	}
+
+	biteImg, err := assets.GetItem("cheese")
+	if err != nil {
+		return fmt.Errorf("failed to load bite image: %w", err)
+	}
+	biteSprite := sprites.NewCharacterSprite(biteImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 9},
+	})
+
+	theGame.bite = biteSprite
+	theGame.bgImage = nil
+	theGame.playerSprite = playerSprite
+	theGame.slimeSprite = slimeSprite
+	theGame.mapTiles = [mapHeight][mapWidth]int{
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1},
+		{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
+		{1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+		{1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
+		{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		{1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1},
+		{1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1},
+		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1},
+		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	}
+	theGame.wallTile = wallTile
+	theGame.floorTile = floorTile
+	theGame.title = GameTitle{
+		Visible:      true,
+		Duration:     5 * time.Second,
+		StartTime:    time.Now(),
+		WordsVisible: 0,
+		ShakeX:       0,
+		ShakeY:       0,
+		Text:         "8 BITES TO WIN!",
+	}
+	theGame.Ended = false
+
+	biteSprite.X, biteSprite.Y = theGame.GetRandomFloorPosition()
+	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition()
+	//select random tile to spawn slime
+	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition()
 	return nil
 }
 
@@ -222,6 +307,12 @@ func (g *Game) drawMap(screen *ebiten.Image) {
 func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawMap(screen)
 
+	// --- Draw Bites ---
+	biteOp := &ebiten.DrawImageOptions{}
+	biteOp.GeoM.Translate(float64(g.bite.X), float64(g.bite.Y))
+	biteImg := g.bite.GetCurrentImage()
+	screen.DrawImage(biteImg, biteOp)
+
 	// --- Draw Player ---
 	playerOp := &ebiten.DrawImageOptions{}
 	playerOp.GeoM.Translate(float64(g.playerSprite.X), float64(g.playerSprite.Y))
@@ -233,6 +324,53 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	slimeOp.GeoM.Translate(float64(g.slimeSprite.X), float64(g.slimeSprite.Y))
 	slimeImg := g.slimeSprite.GetCurrentImage()
 	screen.DrawImage(slimeImg, slimeOp)
+
+	// Draw title on new level
+	if g.title.Visible {
+		g.drawTitle(screen)
+	}
+}
+
+func (g *Game) drawTitle(screen *ebiten.Image) {
+
+	t := text.GoTextFace{
+		Source: font,
+		Size:   24,
+	}
+
+	words := strings.Split(g.title.Text, " ")
+	tw, th := text.Measure(g.title.Text, &t, 0)
+	x, y := screenWidth/2-tw/2, screenHeight/2-th/2
+
+	//Draw white block around text
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Translate(float64(x-10), float64(y-10))
+	bgRect := ebiten.NewImage(int(tw)+20, int(th)+20)
+	//half-transparent background
+	bgRect.Fill(color.RGBA{220, 220, 225, 0})
+	screen.DrawImage(bgRect, bgOp)
+
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(color.Gray{})
+	if time.Since(g.title.LastShakeTime) > 50*time.Millisecond {
+		g.title.ShakeX = rand.IntN(6) - 3
+		g.title.ShakeY = rand.IntN(6) - 3
+		g.title.LastShakeTime = time.Now()
+	}
+	op.GeoM.Translate(float64(g.title.ShakeX), float64(g.title.ShakeY))
+	for i := 0; i < g.title.WordsVisible && i < len(words); i++ {
+		word := words[i]
+		wordWidth, _ := text.Measure(word+" ", &t, 0)
+		text.Draw(screen, word+" ", &t, op)
+		op.GeoM.Translate(float64(wordWidth), 0)
+	}
+	if time.Since(g.title.StartTime) > time.Second*time.Duration(g.title.WordsVisible) && g.title.WordsVisible < len(words) {
+		g.title.WordsVisible++
+	}
+	if time.Since(g.title.StartTime) > g.title.Duration {
+		g.title.Visible = false
+	}
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {

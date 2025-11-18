@@ -16,6 +16,7 @@ const (
 	BackgroundPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACABAMAAAAxE/umAAAAGFBMVEUAAABmM+0oMO4nNO0nM+4mNuwkNOsnMuwQn6+YAAAAEklEQVRo3u3asQ0AAACDof6D5v8K3sA2mDGM4zhcI5qA1/0W0Qj1TjYJAAAAAAAAAIDQWw2Vqg7F4Xv3B3sAAAAAAAAAAMDfRk989pX4rAAAAABJRU5ErkJggg=="
 )
 
+//go:embed sprites/items/cheese.png
 //go:embed sprites/player/yellow.png
 //go:embed sprites/npc/slime.png
 //go:embed sprites/world/wall.png
@@ -36,6 +37,10 @@ func GetFloorTileImage() (*ebiten.Image, error) {
 
 func GetWallTileImage() (*ebiten.Image, error) {
 	return GetSprite("world/wall.png")
+}
+
+func GetItem(item string) (*ebiten.Image, error) {
+	return GetSprite("items/" + item + ".png")
 }
 
 func GetSprite(path string) (*ebiten.Image, error) {
