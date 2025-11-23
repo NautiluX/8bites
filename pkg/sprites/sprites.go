@@ -13,6 +13,7 @@ const (
 	SpriteIdSlime
 	SpriteIdCheese
 	SpriteIdDonut
+	SpriteIdPizza
 )
 
 type CharacterSprite struct {

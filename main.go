@@ -81,7 +81,16 @@ func init() {
 	donutSprite := sprites.NewCharacterSprite(donutImg, 32, 32, []sprites.Animation{
 		{Name: "idle", Frames: 23},
 	}, sprites.SpriteIdDonut)
-	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite}
+
+	pizzaImg, err := assets.GetItem("pizza")
+	if err != nil {
+		log.Fatalf("failed to load pizza image: %v", err)
+	}
+	pizzaSprite := sprites.NewCharacterSprite(pizzaImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 10},
+	}, sprites.SpriteIdPizza)
+
+	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite}
 
 	slimeImg, err := assets.GetSlimeSprite()
 	if err != nil {
