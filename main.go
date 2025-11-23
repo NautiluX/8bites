@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"image"
 	"image/color"
 	_ "image/png"
 	"log"
@@ -30,8 +29,10 @@ const (
 type Game struct {
 	bgImage      *ebiten.Image
 	playerSprite *sprites.CharacterSprite
-	slimeSprite  *sprites.CharacterSprite
-	bite         *sprites.CharacterSprite
+	enemies      []sprites.CharacterSprite
+	bites        []*sprites.CharacterSprite
+	eatenBites   []sprites.CharacterSprite
+	currentBite  *sprites.CharacterSprite
 	mapTiles     [mapHeight][mapWidth]int
 	wallTile     *ebiten.Image
 	floorTile    *ebiten.Image
@@ -53,18 +54,46 @@ type GameTitle struct {
 var (
 	theGame *Game
 	font    *text.GoTextFaceSource
+	bites   []*sprites.CharacterSprite
+	enemies []*sprites.CharacterSprite
 )
 
 // init loads the assets before the game starts.
 func init() {
-	// Initialize the game struct (Global access for simplicity)
-	theGame = &Game{}
-	err := ResetGame()
+	var err error
+	font, err = text.NewGoTextFaceSource(bytes.NewReader(fonts.PressStart2P_ttf))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	font, err = text.NewGoTextFaceSource(bytes.NewReader(fonts.PressStart2P_ttf))
+	cheeseImg, err := assets.GetItem("cheese")
+	if err != nil {
+		log.Fatalf("failed to load cheese image: %v", err)
+	}
+	cheeseSprite := sprites.NewCharacterSprite(cheeseImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 9},
+	}, sprites.SpriteIdCheese)
+
+	donutImg, err := assets.GetItem("donut")
+	if err != nil {
+		log.Fatalf("failed to load donut image: %v", err)
+	}
+	donutSprite := sprites.NewCharacterSprite(donutImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 23},
+	}, sprites.SpriteIdDonut)
+	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite}
+
+	slimeImg, err := assets.GetSlimeSprite()
+	if err != nil {
+		log.Fatalf("failed to load player sprite: %v", err)
+	}
+	slimeSprite := sprites.NewCharacterSprite(slimeImg, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: 10},
+	}, sprites.SpriteIdSlime)
+
+	enemies = []*sprites.CharacterSprite{slimeSprite}
+	theGame = &Game{}
+	err = ResetGame()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,19 +139,22 @@ func (g *Game) handleInputAndMovement() {
 		}
 	}
 
-	// Random movement for slime. 50% chance to change direction each update
-	updateMovement := rand.IntN(101)
-	if updateMovement > 75 && g.slimeSprite.CurrentVx == 0 && g.slimeSprite.X%32 == 0 && g.slimeSprite.Y%32 == 0 {
-		g.slimeSprite.CurrentVx = -1 + rand.IntN(3)
-		g.slimeSprite.CurrentVy = 0
-	}
-	if updateMovement < 25 && g.slimeSprite.CurrentVy == 0 && g.slimeSprite.Y%32 == 0 && g.slimeSprite.X%32 == 0 {
-		g.slimeSprite.CurrentVx = 0
-		g.slimeSprite.CurrentVy = -1 + rand.IntN(3)
-	}
+	for i := range g.enemies {
+		// Random movement for slime. 50% chance to change direction each update
+		slimeSprite := &g.enemies[i]
+		updateMovement := rand.IntN(101)
+		if updateMovement > 75 && slimeSprite.CurrentVx == 0 && slimeSprite.X%32 == 0 && slimeSprite.Y%32 == 0 {
+			slimeSprite.CurrentVx = -1 + rand.IntN(3)
+			slimeSprite.CurrentVy = 0
+		}
+		if updateMovement < 25 && slimeSprite.CurrentVy == 0 && slimeSprite.Y%32 == 0 && slimeSprite.X%32 == 0 {
+			slimeSprite.CurrentVx = 0
+			slimeSprite.CurrentVy = -1 + rand.IntN(3)
+		}
 
-	if !g.checkWallCollision(g.slimeSprite) {
-		g.slimeSprite.Move(screenWidth, screenHeight)
+		if !g.checkWallCollision(slimeSprite) {
+			slimeSprite.Move(screenWidth, screenHeight)
+		}
 	}
 	if !g.checkWallCollision(g.playerSprite) {
 		g.playerSprite.Move(screenWidth, screenHeight)
@@ -130,20 +162,15 @@ func (g *Game) handleInputAndMovement() {
 }
 
 func (g *Game) checkGameEnd() {
-	// Check for collision between player and slime
-	playerRect := ebiten.NewImage(g.playerSprite.Width, g.playerSprite.Height).Bounds()
-	playerRect = playerRect.Add(image.Point{X: g.playerSprite.X, Y: g.playerSprite.Y})
-
-	slimeRect := ebiten.NewImage(g.slimeSprite.Width, g.slimeSprite.Height).Bounds()
-	slimeRect = slimeRect.Add(image.Point{X: g.slimeSprite.X, Y: g.slimeSprite.Y})
-
-	if playerRect.Overlaps(slimeRect) {
-		// Show title
-		g.title.Visible = true
-		g.title.StartTime = time.Now()
-		g.title.WordsVisible = 0
-		g.title.Text = "GAME OVER!"
-		g.Ended = true
+	for _, enemy := range g.enemies {
+		if g.playerSprite.CheckCollision(&enemy) {
+			// Show title
+			g.title.Visible = true
+			g.title.StartTime = time.Now()
+			g.title.WordsVisible = 0
+			g.title.Text = "GAME OVER!"
+			g.Ended = true
+		}
 	}
 }
 
@@ -175,8 +202,10 @@ func (g *Game) checkWallCollision(s *sprites.CharacterSprite) bool {
 
 func (g *Game) animate() {
 	g.playerSprite.Animate()
-	g.slimeSprite.Animate()
-	g.bite.Animate()
+	for i := range g.enemies {
+		g.enemies[i].Animate()
+	}
+	g.currentBite.Animate()
 }
 
 var lastAnimationUpdate time.Time
@@ -204,11 +233,30 @@ func (g *Game) Update() error {
 		return nil
 	}
 	g.checkGameEnd()
+	g.checkBiteEaten()
 
 	g.handleInputAndMovement()
 
 	return nil
 }
+
+func (g *Game) checkBiteEaten() {
+	if g.playerSprite.CheckCollision(g.currentBite) {
+		alreadyEaten := false
+		for _, bite := range g.eatenBites {
+			if g.currentBite.Id == bite.Id {
+				alreadyEaten = true
+				g.placeNewEnemy()
+				break
+			}
+		}
+		if !alreadyEaten {
+			g.eatenBites = append(g.eatenBites, *g.currentBite)
+		}
+		g.placeNewBite()
+	}
+}
+
 func ResetGame() error {
 	playerImg, err := assets.GetPlayerYellowSprite()
 	if err != nil {
@@ -219,15 +267,7 @@ func ResetGame() error {
 		{Name: "left", Frames: 12},
 		{Name: "up", Frames: 12},
 		{Name: "down", Frames: 12},
-	})
-
-	slimeImg, err := assets.GetSlimeSprite()
-	if err != nil {
-		return fmt.Errorf("failed to load player sprite: %w", err)
-	}
-	slimeSprite := sprites.NewCharacterSprite(slimeImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 10},
-	})
+	}, sprites.SpriteIdPlayer)
 
 	wallTile, err := assets.GetWallTileImage()
 	if err != nil {
@@ -239,18 +279,11 @@ func ResetGame() error {
 		return fmt.Errorf("failed to load floor tile image: %w", err)
 	}
 
-	biteImg, err := assets.GetItem("cheese")
-	if err != nil {
-		return fmt.Errorf("failed to load bite image: %w", err)
-	}
-	biteSprite := sprites.NewCharacterSprite(biteImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 9},
-	})
-
-	theGame.bite = biteSprite
+	theGame.bites = bites
+	theGame.eatenBites = []sprites.CharacterSprite{}
 	theGame.bgImage = nil
 	theGame.playerSprite = playerSprite
-	theGame.slimeSprite = slimeSprite
+	theGame.enemies = []sprites.CharacterSprite{}
 	theGame.mapTiles = [mapHeight][mapWidth]int{
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -268,6 +301,8 @@ func ResetGame() error {
 		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1},
 		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	}
+	theGame.placeNewBite()
+	theGame.placeNewEnemy()
 	theGame.wallTile = wallTile
 	theGame.floorTile = floorTile
 	theGame.title = GameTitle{
@@ -281,13 +316,22 @@ func ResetGame() error {
 	}
 	theGame.Ended = false
 
-	biteSprite.X, biteSprite.Y = theGame.GetRandomFloorPosition()
 	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition()
 	//select random tile to spawn slime
-	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition()
 	return nil
 }
 
+func (g *Game) placeNewBite() {
+	g.currentBite = g.bites[rand.IntN(len(theGame.bites))]
+
+	g.currentBite.X, g.currentBite.Y = theGame.GetRandomFloorPosition()
+}
+
+func (g *Game) placeNewEnemy() {
+	slimeSprite := enemies[rand.IntN(len(enemies))]
+	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition()
+	g.enemies = append(g.enemies, *slimeSprite)
+}
 func (g *Game) drawMap(screen *ebiten.Image) {
 	for y := range mapHeight {
 		for x := range mapWidth {
@@ -309,8 +353,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// --- Draw Bites ---
 	biteOp := &ebiten.DrawImageOptions{}
-	biteOp.GeoM.Translate(float64(g.bite.X), float64(g.bite.Y))
-	biteImg := g.bite.GetCurrentImage()
+	biteOp.GeoM.Translate(float64(g.currentBite.X), float64(g.currentBite.Y))
+	biteImg := g.currentBite.GetCurrentImage()
 	screen.DrawImage(biteImg, biteOp)
 
 	// --- Draw Player ---
@@ -319,11 +363,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	playerImg := g.playerSprite.GetCurrentImage()
 	screen.DrawImage(playerImg, playerOp)
 
-	// --- Draw Slime ---
-	slimeOp := &ebiten.DrawImageOptions{}
-	slimeOp.GeoM.Translate(float64(g.slimeSprite.X), float64(g.slimeSprite.Y))
-	slimeImg := g.slimeSprite.GetCurrentImage()
-	screen.DrawImage(slimeImg, slimeOp)
+	for _, enemy := range g.enemies {
+		slimeOp := &ebiten.DrawImageOptions{}
+		slimeOp.GeoM.Translate(float64(enemy.X), float64(enemy.Y))
+		slimeImg := enemy.GetCurrentImage()
+		screen.DrawImage(slimeImg, slimeOp)
+	}
+
+	for i, bite := range g.eatenBites {
+		eatenBiteOp := &ebiten.DrawImageOptions{}
+		eatenBiteOp.GeoM.Translate(float64(i)*32, 0)
+		eatenBiteImg := bite.GetFirstImage()
+		screen.DrawImage(eatenBiteImg, eatenBiteOp)
+	}
 
 	// Draw title on new level
 	if g.title.Visible {

@@ -17,6 +17,7 @@ const (
 )
 
 //go:embed sprites/items/cheese.png
+//go:embed sprites/items/donut.png
 //go:embed sprites/player/yellow.png
 //go:embed sprites/npc/slime.png
 //go:embed sprites/world/wall.png

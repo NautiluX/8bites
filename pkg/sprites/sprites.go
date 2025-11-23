@@ -6,6 +6,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type SpriteId int
+
+const (
+	SpriteIdPlayer SpriteId = iota
+	SpriteIdSlime
+	SpriteIdCheese
+	SpriteIdDonut
+)
+
 type CharacterSprite struct {
 	Image            *ebiten.Image
 	Width            int
@@ -18,6 +27,16 @@ type CharacterSprite struct {
 	CurrentFrame     int
 	CurrentVx        int
 	CurrentVy        int
+	Id               SpriteId
+}
+
+func (s *CharacterSprite) CheckCollision(sprite *CharacterSprite) bool {
+	ownRect := ebiten.NewImage(s.Width, s.Height).Bounds()
+	ownRect = ownRect.Add(image.Point{X: s.X, Y: s.Y})
+
+	spriteRect := ebiten.NewImage(sprite.Width, sprite.Height).Bounds()
+	spriteRect = spriteRect.Add(image.Point{X: sprite.X, Y: sprite.Y})
+	return ownRect.Overlaps(spriteRect)
 }
 
 type Animation struct {
@@ -25,7 +44,7 @@ type Animation struct {
 	Frames int
 }
 
-func NewCharacterSprite(img *ebiten.Image, width, height int, animations []Animation) *CharacterSprite {
+func NewCharacterSprite(img *ebiten.Image, width, height int, animations []Animation, id SpriteId) *CharacterSprite {
 	s := &CharacterSprite{
 		Image:            img,
 		Width:            width,
@@ -33,6 +52,7 @@ func NewCharacterSprite(img *ebiten.Image, width, height int, animations []Anima
 		Frames:           img.Bounds().Dx() / width,
 		Animations:       animations,
 		CurrentAnimation: 0,
+		Id:               id,
 	}
 	return s
 }
@@ -81,4 +101,8 @@ func (s *CharacterSprite) GetCurrentImage() *ebiten.Image {
 	x := s.CurrentFrame * s.Width
 	y := s.CurrentAnimation * s.Height
 	return s.Image.SubImage(image.Rect(x, y, x+s.Width, y+s.Height)).(*ebiten.Image)
+}
+
+func (s *CharacterSprite) GetFirstImage() *ebiten.Image {
+	return s.Image.SubImage(image.Rect(0, 0, s.Width, s.Height)).(*ebiten.Image)
 }
