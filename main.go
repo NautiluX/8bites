@@ -66,31 +66,15 @@ func init() {
 		log.Fatal(err)
 	}
 
-	cheeseImg, err := assets.GetItem("cheese")
-	if err != nil {
-		log.Fatalf("failed to load cheese image: %v", err)
-	}
-	cheeseSprite := sprites.NewCharacterSprite(cheeseImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 9},
-	}, sprites.SpriteIdCheese)
+	cheeseSprite := loadSprite("cheese", sprites.SpriteIdCheese, 9)
 
-	donutImg, err := assets.GetItem("donut")
-	if err != nil {
-		log.Fatalf("failed to load donut image: %v", err)
-	}
-	donutSprite := sprites.NewCharacterSprite(donutImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 23},
-	}, sprites.SpriteIdDonut)
+	pizzaSprite := loadSprite("pizza", sprites.SpriteIdPizza, 10)
 
-	pizzaImg, err := assets.GetItem("pizza")
-	if err != nil {
-		log.Fatalf("failed to load pizza image: %v", err)
-	}
-	pizzaSprite := sprites.NewCharacterSprite(pizzaImg, 32, 32, []sprites.Animation{
-		{Name: "idle", Frames: 10},
-	}, sprites.SpriteIdPizza)
+	donutSprite := loadSprite("donut", sprites.SpriteIdDonut, 23)
 
-	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite}
+	sushiSprite := loadSprite("sushi", sprites.SpriteIdSushi, 12)
+
+	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite, sushiSprite}
 
 	slimeImg, err := assets.GetSlimeSprite()
 	if err != nil {
@@ -106,6 +90,17 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func loadSprite(spriteName string, spriteId sprites.SpriteId, frames int) *sprites.CharacterSprite {
+	img, err := assets.GetItem(spriteName)
+	if err != nil {
+		log.Fatalf("failed to load donut image: %v", err)
+	}
+	sprite := sprites.NewCharacterSprite(img, 32, 32, []sprites.Animation{
+		{Name: "idle", Frames: frames},
+	}, spriteId)
+	return sprite
 }
 
 func (g *Game) GetRandomFloorPosition() (int, int) {
