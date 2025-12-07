@@ -2,6 +2,7 @@ package sprites
 
 import (
 	"image"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -15,6 +16,7 @@ const (
 	SpriteIdDonut
 	SpriteIdPizza
 	SpriteIdSushi
+	SpriteIdOrange
 )
 
 type CharacterSprite struct {
@@ -32,13 +34,21 @@ type CharacterSprite struct {
 	Id               SpriteId
 }
 
-func (s *CharacterSprite) CheckCollision(sprite *CharacterSprite) bool {
-	ownRect := ebiten.NewImage(s.Width, s.Height).Bounds()
-	ownRect = ownRect.Add(image.Point{X: s.X, Y: s.Y})
+type PlayerSprite struct {
+	CharacterSprite
+	NextVx        int
+	NextVy        int
+	NextAnimation int
+}
 
-	spriteRect := ebiten.NewImage(sprite.Width, sprite.Height).Bounds()
-	spriteRect = spriteRect.Add(image.Point{X: sprite.X, Y: sprite.Y})
-	return ownRect.Overlaps(spriteRect)
+func (s *CharacterSprite) CheckCollision(sprite *CharacterSprite) bool {
+	ownCenter := image.Point{X: s.X + s.Width/2, Y: s.Y + s.Height/2}
+	spriteCenter := image.Point{X: sprite.X + sprite.Width/2, Y: sprite.Y + sprite.Height/2}
+	distanceX := ownCenter.X - spriteCenter.X
+	distanceY := ownCenter.Y - spriteCenter.Y
+	distance := math.Sqrt(float64(distanceX*distanceX) + float64(distanceY*distanceY))
+
+	return distance < float64(s.Width)/2
 }
 
 type Animation struct {
@@ -57,6 +67,31 @@ func NewCharacterSprite(img *ebiten.Image, width, height int, animations []Anima
 		Id:               id,
 	}
 	return s
+}
+
+func NewPlayerSprite(img *ebiten.Image, width, height int, animations []Animation) *PlayerSprite {
+	s := &PlayerSprite{
+		CharacterSprite: CharacterSprite{
+			Image:            img,
+			Width:            width,
+			Height:           height,
+			Frames:           img.Bounds().Dx() / width,
+			Animations:       animations,
+			CurrentAnimation: 0,
+			Id:               SpriteIdPlayer,
+		},
+	}
+	return s
+}
+
+func (s *PlayerSprite) SetNextAnimation(animation string) {
+	for i, anim := range s.Animations {
+		if anim.Name == animation {
+			s.NextAnimation = i
+			return
+		}
+	}
+
 }
 
 func (s *CharacterSprite) SetAnimation(animation string) {

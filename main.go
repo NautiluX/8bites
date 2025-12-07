@@ -28,7 +28,7 @@ const (
 
 type Game struct {
 	bgImage      *ebiten.Image
-	playerSprite *sprites.CharacterSprite
+	playerSprite *sprites.PlayerSprite
 	enemies      []sprites.CharacterSprite
 	bites        []*sprites.CharacterSprite
 	eatenBites   []sprites.CharacterSprite
@@ -67,14 +67,12 @@ func init() {
 	}
 
 	cheeseSprite := loadSprite("cheese", sprites.SpriteIdCheese, 9)
-
 	pizzaSprite := loadSprite("pizza", sprites.SpriteIdPizza, 10)
-
 	donutSprite := loadSprite("donut", sprites.SpriteIdDonut, 23)
-
 	sushiSprite := loadSprite("sushi", sprites.SpriteIdSushi, 12)
+	orangeSprite := loadSprite("orange", sprites.SpriteIdOrange, 8)
 
-	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite, sushiSprite}
+	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite, sushiSprite, orangeSprite}
 
 	slimeImg, err := assets.GetSlimeSprite()
 	if err != nil {
@@ -117,29 +115,51 @@ func (g *Game) GetRandomFloorPosition() (int, int) {
 // enforcing screen boundaries.
 func (g *Game) handleInputAndMovement() {
 	// Handle Up/W
-	if g.playerSprite.Y%32 == 0 && g.playerSprite.X%32 == 0 {
-		if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
+	// Move queued
+	if g.playerSprite.Y%32 == 0 && g.playerSprite.X%32 == 0 && (g.playerSprite.NextVx != 0 || g.playerSprite.NextVy != 0) {
+		g.playerSprite.CurrentVx = g.playerSprite.NextVx
+		g.playerSprite.CurrentVy = g.playerSprite.NextVy
+		g.playerSprite.CurrentAnimation = g.playerSprite.NextAnimation
+		g.playerSprite.NextVx = 0
+		g.playerSprite.NextVy = 0
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
+		if g.playerSprite.CurrentVy != 0 {
 			g.playerSprite.CurrentVy = -playerSpeed
-			g.playerSprite.CurrentVx = 0
 			g.playerSprite.SetAnimation("up")
+		} else {
+			g.playerSprite.NextVy = -playerSpeed
+			g.playerSprite.SetNextAnimation("up")
 		}
-		// Handle Down/S
-		if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
+	}
+	// Handle Down/S
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
+		if g.playerSprite.CurrentVy != 0 {
 			g.playerSprite.CurrentVy = playerSpeed
-			g.playerSprite.CurrentVx = 0
 			g.playerSprite.SetAnimation("down")
+		} else {
+			g.playerSprite.NextVy = playerSpeed
+			g.playerSprite.SetNextAnimation("down")
 		}
-		// Handle Left/A
-		if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+	}
+	// Handle Left/A
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
+		if g.playerSprite.CurrentVx != 0 {
 			g.playerSprite.CurrentVx = -playerSpeed
-			g.playerSprite.CurrentVy = 0
 			g.playerSprite.SetAnimation("left")
+		} else {
+			g.playerSprite.NextVx = -playerSpeed
+			g.playerSprite.SetNextAnimation("left")
 		}
-		// Handle Right/D
-		if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+	}
+	// Handle Right/D
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) || ebiten.IsKeyPressed(ebiten.KeyD) {
+		if g.playerSprite.CurrentVx != 0 {
 			g.playerSprite.CurrentVx = playerSpeed
-			g.playerSprite.CurrentVy = 0
 			g.playerSprite.SetAnimation("right")
+		} else {
+			g.playerSprite.NextVx = playerSpeed
+			g.playerSprite.SetNextAnimation("right")
 		}
 	}
 
@@ -160,7 +180,7 @@ func (g *Game) handleInputAndMovement() {
 			slimeSprite.Move(screenWidth, screenHeight)
 		}
 	}
-	if !g.checkWallCollision(g.playerSprite) {
+	if !g.checkWallCollision(&g.playerSprite.CharacterSprite) {
 		g.playerSprite.Move(screenWidth, screenHeight)
 	}
 }
@@ -266,12 +286,12 @@ func ResetGame() error {
 	if err != nil {
 		log.Fatalf("failed to load player sprite: %v", err)
 	}
-	playerSprite := sprites.NewCharacterSprite(playerImg, 32, 32, []sprites.Animation{
+	playerSprite := sprites.NewPlayerSprite(playerImg, 32, 32, []sprites.Animation{
 		{Name: "right", Frames: 12},
 		{Name: "left", Frames: 12},
 		{Name: "up", Frames: 12},
 		{Name: "down", Frames: 12},
-	}, sprites.SpriteIdPlayer)
+	})
 
 	wallTile, err := assets.GetWallTileImage()
 	if err != nil {
