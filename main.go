@@ -28,7 +28,7 @@ const (
 
 type Game struct {
 	bgImage      *ebiten.Image
-	playerSprite *sprites.PlayerSprite
+	playerSprite *sprites.Player
 	enemies      []sprites.CharacterSprite
 	bites        []*sprites.CharacterSprite
 	eatenBites   []sprites.CharacterSprite
@@ -74,6 +74,7 @@ func init() {
 		loadSprite("orange", sprites.SpriteIdOrange, 8),
 		loadSprite("avocado", sprites.SpriteIdAvocado, 21),
 		loadSprite("apple", sprites.SpriteIdApple, 20),
+		loadSprite("banana", sprites.SpriteIdBanana, 21),
 	}
 
 	slimeImg, err := assets.GetSlimeSprite()
@@ -188,6 +189,15 @@ func (g *Game) handleInputAndMovement() {
 }
 
 func (g *Game) checkGameEnd() {
+	if len(g.eatenBites) >= 8 {
+		// Show title
+		g.title.Visible = true
+		g.title.StartTime = time.Now()
+		g.title.WordsVisible = 0
+		g.title.Text = "YOU WIN!"
+		g.Ended = true
+		return
+	}
 	for _, enemy := range g.enemies {
 		if g.playerSprite.CheckCollision(&enemy) {
 			// Show title
@@ -272,12 +282,14 @@ func (g *Game) checkBiteEaten() {
 		for _, bite := range g.eatenBites {
 			if g.currentBite.Id == bite.Id {
 				alreadyEaten = true
+				g.playerSprite.Points += 100 * len(g.enemies)
 				g.placeNewEnemy()
 				break
 			}
 		}
 		if !alreadyEaten {
 			g.eatenBites = append(g.eatenBites, *g.currentBite)
+			g.playerSprite.Points += 500 + 100*len(g.enemies)
 		}
 		g.placeNewBite()
 	}
@@ -403,10 +415,31 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(eatenBiteImg, eatenBiteOp)
 	}
 
+	g.drawScore(screen)
+
 	// Draw title on new level
 	if g.title.Visible {
 		g.drawTitle(screen)
 	}
+}
+
+func (g *Game) drawScore(screen *ebiten.Image) {
+	t := text.GoTextFace{
+		Source: font,
+		Size:   16,
+	}
+
+	numToDraw := g.playerSprite.Points
+	if g.playerSprite.Points > g.playerSprite.LastPoints {
+		numToDraw = g.playerSprite.LastPoints
+		g.playerSprite.LastPoints += (g.playerSprite.Points-g.playerSprite.LastPoints)/10 + 1
+	}
+	// draw score with 10 leading zeros
+	pointsText := fmt.Sprintf("Score: %010d", numToDraw)
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(32, float64(screenHeight-24))
+	op.ColorScale.ScaleWithColor(color.White)
+	text.Draw(screen, pointsText, &t, op)
 }
 
 func (g *Game) drawTitle(screen *ebiten.Image) {

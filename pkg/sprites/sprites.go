@@ -19,6 +19,7 @@ const (
 	SpriteIdOrange
 	SpriteIdAvocado
 	SpriteIdApple
+	SpriteIdBanana
 )
 
 type CharacterSprite struct {
@@ -36,11 +37,13 @@ type CharacterSprite struct {
 	Id               SpriteId
 }
 
-type PlayerSprite struct {
+type Player struct {
 	CharacterSprite
 	NextVx        int
 	NextVy        int
 	NextAnimation int
+	Points        int
+	LastPoints    int
 }
 
 func (s *CharacterSprite) CheckCollision(sprite *CharacterSprite) bool {
@@ -71,8 +74,8 @@ func NewCharacterSprite(img *ebiten.Image, width, height int, animations []Anima
 	return s
 }
 
-func NewPlayerSprite(img *ebiten.Image, width, height int, animations []Animation) *PlayerSprite {
-	s := &PlayerSprite{
+func NewPlayerSprite(img *ebiten.Image, width, height int, animations []Animation) *Player {
+	s := &Player{
 		CharacterSprite: CharacterSprite{
 			Image:            img,
 			Width:            width,
@@ -86,7 +89,7 @@ func NewPlayerSprite(img *ebiten.Image, width, height int, animations []Animatio
 	return s
 }
 
-func (s *PlayerSprite) SetNextAnimation(animation string) {
+func (s *Player) SetNextAnimation(animation string) {
 	for i, anim := range s.Animations {
 		if anim.Name == animation {
 			s.NextAnimation = i
