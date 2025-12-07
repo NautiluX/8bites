@@ -66,13 +66,15 @@ func init() {
 		log.Fatal(err)
 	}
 
-	cheeseSprite := loadSprite("cheese", sprites.SpriteIdCheese, 9)
-	pizzaSprite := loadSprite("pizza", sprites.SpriteIdPizza, 10)
-	donutSprite := loadSprite("donut", sprites.SpriteIdDonut, 23)
-	sushiSprite := loadSprite("sushi", sprites.SpriteIdSushi, 12)
-	orangeSprite := loadSprite("orange", sprites.SpriteIdOrange, 8)
-
-	bites = []*sprites.CharacterSprite{cheeseSprite, donutSprite, pizzaSprite, sushiSprite, orangeSprite}
+	bites = []*sprites.CharacterSprite{
+		loadSprite("cheese", sprites.SpriteIdCheese, 9),
+		loadSprite("pizza", sprites.SpriteIdPizza, 10),
+		loadSprite("donut", sprites.SpriteIdDonut, 23),
+		loadSprite("sushi", sprites.SpriteIdSushi, 12),
+		loadSprite("orange", sprites.SpriteIdOrange, 8),
+		loadSprite("avocado", sprites.SpriteIdAvocado, 21),
+		loadSprite("apple", sprites.SpriteIdApple, 20),
+	}
 
 	slimeImg, err := assets.GetSlimeSprite()
 	if err != nil {
