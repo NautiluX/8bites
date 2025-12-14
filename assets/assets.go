@@ -1,9 +1,13 @@
 package assets
 
 import (
+	"bytes"
 	"embed"
+	"io"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
@@ -17,6 +21,7 @@ const (
 )
 
 //go:embed sprites/**/*.png
+//go:embed sfx/*.wav
 var folder embed.FS
 
 func GetPlayerYellowSprite() (*ebiten.Image, error) {
@@ -45,4 +50,44 @@ func GetSprite(path string) (*ebiten.Image, error) {
 		return nil, err
 	}
 	return img, nil
+}
+
+func GetBackgroundMusic() (*audio.Player, error) {
+	reader, err := folder.Open("sfx/backgroundmusic_1.wav")
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := wav.DecodeWithSampleRate(44100, reader)
+
+	audioContext := audio.NewContext(44100)
+	if err != nil {
+		return nil, err
+	}
+
+	s := audio.NewInfiniteLoop(stream, stream.Length())
+	player, err := audioContext.NewPlayer(s)
+	if err != nil {
+		return nil, err
+	}
+	return player, nil
+}
+
+// A simple wrapper type that embeds *bytes.Reader and adds a no-op Close method.
+// By embedding *bytes.Reader, it automatically satisfies the io.Reader and io.Seeker interfaces.
+type ByteReadSeekCloser struct {
+	*bytes.Reader
+}
+
+// Close satisfies the io.Closer interface.
+func (b ByteReadSeekCloser) Close() error {
+	// No resources to clean up for an in-memory byte array, so we return nil.
+	return nil
+}
+
+// NewReadSeekCloser creates an io.ReadSeekCloser from a byte slice.
+func NewReadSeekCloser(data []byte) io.ReadSeekCloser {
+	return ByteReadSeekCloser{
+		Reader: bytes.NewReader(data),
+	}
 }

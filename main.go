@@ -6,6 +6,7 @@ import (
 	"image/color"
 	_ "image/png"
 	"log"
+	"math"
 	"math/rand/v2"
 	"strings"
 	"time"
@@ -104,11 +105,12 @@ func loadSprite(spriteName string, spriteId sprites.SpriteId, frames int) *sprit
 	return sprite
 }
 
-func (g *Game) GetRandomFloorPosition() (int, int) {
+func (g *Game) GetRandomFloorPosition(minDistance int) (int, int) {
 	for {
 		x := rand.IntN(mapWidth)
 		y := rand.IntN(mapHeight)
-		if g.mapTiles[y][x] == 0 {
+		if g.mapTiles[y][x] == 0 &&
+			(math.Abs(float64(g.playerSprite.X/32-x*32)) >= float64(minDistance) || math.Abs(float64(g.playerSprite.Y/32-y*32)) >= float64(minDistance)) {
 			return x * 32, y * 32
 		}
 	}
@@ -354,7 +356,7 @@ func ResetGame() error {
 	}
 	theGame.Ended = false
 
-	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition()
+	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition(64)
 	//select random tile to spawn slime
 	return nil
 }
@@ -362,13 +364,22 @@ func ResetGame() error {
 func (g *Game) placeNewBite() {
 	g.currentBite = g.bites[rand.IntN(len(theGame.bites))]
 
-	g.currentBite.X, g.currentBite.Y = theGame.GetRandomFloorPosition()
+	g.currentBite.X, g.currentBite.Y = theGame.GetRandomFloorPosition(64)
 }
 
 func (g *Game) placeNewEnemy() {
 	slimeSprite := enemies[rand.IntN(len(enemies))]
-	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition()
+	slimeSprite.X, slimeSprite.Y = theGame.GetRandomFloorPosition(64)
 	g.enemies = append(g.enemies, *slimeSprite)
+}
+
+func (g *Game) StartBackgroundMusic() {
+	bgMusic, err := assets.GetBackgroundMusic()
+	if err != nil {
+		log.Fatalf("failed to load background music: %v", err)
+	}
+	fmt.Println("Starting background music")
+	bgMusic.Play()
 }
 func (g *Game) drawMap(screen *ebiten.Image) {
 	for y := range mapHeight {
@@ -492,6 +503,8 @@ func main() {
 	if theGame == nil {
 		log.Fatal("Game initialization failed. Check the init function.")
 	}
+
+	go theGame.StartBackgroundMusic()
 
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("8bites")
