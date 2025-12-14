@@ -14,6 +14,7 @@ import (
 	"github.com/NautiluX/8bites/assets"
 	"github.com/NautiluX/8bites/pkg/sprites"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -32,12 +33,14 @@ var (
 		{
 			Name:              "level_1",
 			Tiles:             "level_1",
+			Soundtrack:        "backgroundmusic_1",
 			ReoccurranceRetry: 2,
 			StartEnemies:      3,
 		},
 		{
 			Name:              "level_2",
 			Tiles:             "level_2",
+			Soundtrack:        "backgroundmusic_1",
 			ReoccurranceRetry: 1,
 			StartEnemies:      3,
 		},
@@ -47,6 +50,7 @@ var (
 type Level struct {
 	Name              string
 	Tiles             string
+	Soundtrack        string
 	ReoccurranceRetry int
 	StartEnemies      int
 }
@@ -65,6 +69,7 @@ type Game struct {
 	Ended        bool
 	Lost         bool
 	CurrentLevel int
+	MusicPlayer  *audio.Player
 }
 
 type GameTitle struct {
@@ -337,6 +342,11 @@ func (g *Game) checkBiteEaten() {
 }
 
 func ResetGame() error {
+	if theGame.MusicPlayer != nil {
+		// Stop previous music
+		theGame.MusicPlayer.Close()
+	}
+	theGame.StartBackgroundMusic()
 	if theGame.playerSprite == nil || theGame.Lost {
 		playerImg, err := assets.GetPlayerYellowSprite()
 		if err != nil {
@@ -413,13 +423,15 @@ func (g *Game) placeNewEnemy() {
 }
 
 func (g *Game) StartBackgroundMusic() {
-	bgMusic, err := assets.GetBackgroundMusic()
+	bgMusic, err := assets.GetBackgroundMusic(levels[g.CurrentLevel].Soundtrack)
 	if err != nil {
 		log.Fatalf("failed to load background music: %v", err)
 	}
 	fmt.Println("Starting background music")
-	bgMusic.Play()
+	theGame.MusicPlayer = bgMusic
+	go bgMusic.Play()
 }
+
 func (g *Game) drawMap(screen *ebiten.Image) {
 	for y := range mapHeight {
 		for x := range mapWidth {
@@ -542,8 +554,6 @@ func main() {
 	if theGame == nil {
 		log.Fatal("Game initialization failed. Check the init function.")
 	}
-
-	go theGame.StartBackgroundMusic()
 
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 	ebiten.SetWindowTitle("8bites")

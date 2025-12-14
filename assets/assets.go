@@ -54,17 +54,21 @@ func GetSprite(path string) (*ebiten.Image, error) {
 	return img, nil
 }
 
-func GetBackgroundMusic() (*audio.Player, error) {
-	reader, err := folder.Open("sfx/backgroundmusic_1.wav")
+var audioContext *audio.Context
+
+func GetBackgroundMusic(soundtrack string) (*audio.Player, error) {
+	reader, err := folder.Open("sfx/" + soundtrack + ".wav")
 	if err != nil {
 		return nil, err
 	}
 
 	stream, err := wav.DecodeWithSampleRate(44100, reader)
 
-	audioContext := audio.NewContext(44100)
-	if err != nil {
-		return nil, err
+	if audioContext == nil {
+		audioContext = audio.NewContext(44100)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	s := audio.NewInfiniteLoop(stream, stream.Length())
