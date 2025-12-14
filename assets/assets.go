@@ -3,6 +3,7 @@ package assets
 import (
 	"bytes"
 	"embed"
+	"fmt"
 	"io"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -22,6 +23,7 @@ const (
 
 //go:embed sprites/**/*.png
 //go:embed sfx/*.wav
+//go:embed maps/*.txt
 var folder embed.FS
 
 func GetPlayerYellowSprite() (*ebiten.Image, error) {
@@ -90,4 +92,37 @@ func NewReadSeekCloser(data []byte) io.ReadSeekCloser {
 	return ByteReadSeekCloser{
 		Reader: bytes.NewReader(data),
 	}
+}
+
+func GetMapTiles(name string) ([15][20]int, error) {
+	file, err := folder.Open("maps/" + name + ".txt")
+	if err != nil {
+		return [15][20]int{}, err
+	}
+	defer file.Close()
+
+	var tiles [15][20]int
+	var buf = make([]byte, 1)
+	for y := 0; y < 15; y++ {
+		for x := 0; x < 20; x++ {
+			_, err := file.Read(buf)
+			if err != nil {
+				return [15][20]int{}, fmt.Errorf("error reading map file: %w", err)
+			}
+			for buf[0] == '\n' || buf[0] == ' ' {
+				_, err := file.Read(buf)
+				if err != nil {
+					return [15][20]int{}, fmt.Errorf("error reading map file: %w", err)
+				}
+			}
+			fmt.Print(string(buf))
+			var tile int
+			_, err = fmt.Sscanf(string(buf), "%d", &tile)
+			if err != nil {
+				return [15][20]int{}, err
+			}
+			tiles[y][x] = tile
+		}
+	}
+	return tiles, nil
 }

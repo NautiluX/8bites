@@ -27,6 +27,30 @@ const (
 	playerSpeed  = 2
 )
 
+var (
+	levels = []Level{
+		{
+			Name:              "level_1",
+			Tiles:             "level_1",
+			ReoccurranceRetry: 2,
+			StartEnemies:      3,
+		},
+		{
+			Name:              "level_2",
+			Tiles:             "level_2",
+			ReoccurranceRetry: 1,
+			StartEnemies:      3,
+		},
+	}
+)
+
+type Level struct {
+	Name              string
+	Tiles             string
+	ReoccurranceRetry int
+	StartEnemies      int
+}
+
 type Game struct {
 	bgImage      *ebiten.Image
 	playerSprite *sprites.Player
@@ -39,6 +63,8 @@ type Game struct {
 	floorTile    *ebiten.Image
 	title        GameTitle
 	Ended        bool
+	Lost         bool
+	CurrentLevel int
 }
 
 type GameTitle struct {
@@ -196,7 +222,14 @@ func (g *Game) checkGameEnd() {
 		g.title.Visible = true
 		g.title.StartTime = time.Now()
 		g.title.WordsVisible = 0
-		g.title.Text = "YOU WIN!"
+		if g.CurrentLevel+1 >= len(levels) {
+			// Game completed
+			g.title.Text = "THE END - GZ!"
+			g.Ended = true
+			return
+		}
+		g.title.Text = "YOU WIN! HIT [SPACE]"
+		g.CurrentLevel++
 		g.Ended = true
 		return
 	}
@@ -206,8 +239,9 @@ func (g *Game) checkGameEnd() {
 			g.title.Visible = true
 			g.title.StartTime = time.Now()
 			g.title.WordsVisible = 0
-			g.title.Text = "GAME OVER!"
+			g.title.Text = "GAME OVER! HIT [SPACE]"
 			g.Ended = true
+			g.Lost = true
 		}
 	}
 }
@@ -262,7 +296,7 @@ func (g *Game) Update() error {
 	}
 
 	if g.Ended {
-		if ebiten.IsKeyPressed(ebiten.KeyR) {
+		if ebiten.IsKeyPressed(ebiten.KeyR) || ebiten.IsKeyPressed(ebiten.KeySpace) {
 			err := ResetGame()
 			if err != nil {
 				log.Fatalf("Failed to reset game: %v", err)
@@ -278,36 +312,46 @@ func (g *Game) Update() error {
 	return nil
 }
 
-func (g *Game) checkBiteEaten() {
-	if g.playerSprite.CheckCollision(g.currentBite) {
-		alreadyEaten := false
-		for _, bite := range g.eatenBites {
-			if g.currentBite.Id == bite.Id {
-				alreadyEaten = true
-				g.playerSprite.Points += 100 * len(g.enemies)
-				g.placeNewEnemy()
-				break
-			}
+func (g *Game) hasBiteBeenEaten(bite *sprites.CharacterSprite) bool {
+	for _, eatenBite := range g.eatenBites {
+		if bite.Id == eatenBite.Id {
+			return true
 		}
-		if !alreadyEaten {
-			g.eatenBites = append(g.eatenBites, *g.currentBite)
-			g.playerSprite.Points += 500 + 100*len(g.enemies)
-		}
-		g.placeNewBite()
 	}
+	return false
+}
+
+func (g *Game) checkBiteEaten() {
+	if !g.playerSprite.CheckCollision(g.currentBite) {
+		return
+	}
+	if !g.hasBiteBeenEaten(g.currentBite) {
+		g.eatenBites = append(g.eatenBites, *g.currentBite)
+		g.playerSprite.Points += 500 + 100*len(g.enemies)
+		g.placeNewBite()
+		return
+	}
+	g.playerSprite.Points += 100 * len(g.enemies)
+	g.placeNewEnemy()
+	g.placeNewBite()
 }
 
 func ResetGame() error {
-	playerImg, err := assets.GetPlayerYellowSprite()
-	if err != nil {
-		log.Fatalf("failed to load player sprite: %v", err)
+	if theGame.playerSprite == nil || theGame.Lost {
+		playerImg, err := assets.GetPlayerYellowSprite()
+		if err != nil {
+			log.Fatalf("failed to load player sprite: %v", err)
+		}
+		playerSprite := sprites.NewPlayerSprite(playerImg, 32, 32, []sprites.Animation{
+			{Name: "right", Frames: 12},
+			{Name: "left", Frames: 12},
+			{Name: "up", Frames: 12},
+			{Name: "down", Frames: 12},
+		})
+		theGame.playerSprite = playerSprite
+		theGame.Lost = false
+		theGame.CurrentLevel = 0
 	}
-	playerSprite := sprites.NewPlayerSprite(playerImg, 32, 32, []sprites.Animation{
-		{Name: "right", Frames: 12},
-		{Name: "left", Frames: 12},
-		{Name: "up", Frames: 12},
-		{Name: "down", Frames: 12},
-	})
 
 	wallTile, err := assets.GetWallTileImage()
 	if err != nil {
@@ -322,27 +366,15 @@ func ResetGame() error {
 	theGame.bites = bites
 	theGame.eatenBites = []sprites.CharacterSprite{}
 	theGame.bgImage = nil
-	theGame.playerSprite = playerSprite
 	theGame.enemies = []sprites.CharacterSprite{}
-	theGame.mapTiles = [mapHeight][mapWidth]int{
-		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1},
-		{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1},
-		{1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
-		{1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
-		{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-		{1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1},
-		{1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1},
-		{1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1},
-		{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	theGame.mapTiles, err = assets.GetMapTiles(levels[theGame.CurrentLevel].Tiles)
+	if err != nil {
+		return fmt.Errorf("failed to load map tiles: %w", err)
 	}
 	theGame.placeNewBite()
-	theGame.placeNewEnemy()
+	for range levels[theGame.CurrentLevel].StartEnemies {
+		theGame.placeNewEnemy()
+	}
 	theGame.wallTile = wallTile
 	theGame.floorTile = floorTile
 	theGame.title = GameTitle{
@@ -356,13 +388,20 @@ func ResetGame() error {
 	}
 	theGame.Ended = false
 
-	playerSprite.X, playerSprite.Y = theGame.GetRandomFloorPosition(64)
+	theGame.playerSprite.X, theGame.playerSprite.Y = theGame.GetRandomFloorPosition(64)
 	//select random tile to spawn slime
 	return nil
 }
 
 func (g *Game) placeNewBite() {
 	g.currentBite = g.bites[rand.IntN(len(theGame.bites))]
+	// retry if bite is already eaten, according to level reoccurrance settings
+	for range levels[g.CurrentLevel].ReoccurranceRetry {
+		if !g.hasBiteBeenEaten(g.currentBite) {
+			break
+		}
+		g.currentBite = g.bites[rand.IntN(len(theGame.bites))]
+	}
 
 	g.currentBite.X, g.currentBite.Y = theGame.GetRandomFloorPosition(64)
 }
