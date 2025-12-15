@@ -221,7 +221,7 @@ func (g *Game) handleInputAndMovement() {
 	}
 }
 
-func (g *Game) checkGameEnd() {
+func (g *Game) checkGameEnd() error {
 	if len(g.eatenBites) >= 8 {
 		// Show title
 		g.title.Visible = true
@@ -231,12 +231,12 @@ func (g *Game) checkGameEnd() {
 			// Game completed
 			g.title.Text = "THE END - GZ!"
 			g.Ended = true
-			return
+			return nil
 		}
 		g.title.Text = "YOU WIN! HIT [SPACE]"
 		g.CurrentLevel++
 		g.Ended = true
-		return
+		return nil
 	}
 	for _, enemy := range g.enemies {
 		if g.playerSprite.CheckCollision(&enemy) {
@@ -247,8 +247,16 @@ func (g *Game) checkGameEnd() {
 			g.title.Text = "GAME OVER! HIT [SPACE]"
 			g.Ended = true
 			g.Lost = true
+			player, err := assets.GetSfx("gameover", false)
+			if err != nil {
+				return fmt.Errorf("failed to load game over sfx: %w", err)
+			}
+			g.MusicPlayer.Close()
+			go player.Play()
+			return nil
 		}
 	}
+	return nil
 }
 
 func (g *Game) checkWallCollision(s *sprites.CharacterSprite) bool {
@@ -309,7 +317,10 @@ func (g *Game) Update() error {
 		}
 		return nil
 	}
-	g.checkGameEnd()
+	err := g.checkGameEnd()
+	if err != nil {
+		return err
+	}
 	g.checkBiteEaten()
 
 	g.handleInputAndMovement()

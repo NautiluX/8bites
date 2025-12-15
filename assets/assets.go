@@ -1,10 +1,8 @@
 package assets
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
-	"io"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -57,7 +55,11 @@ func GetSprite(path string) (*ebiten.Image, error) {
 var audioContext *audio.Context
 
 func GetBackgroundMusic(soundtrack string) (*audio.Player, error) {
-	reader, err := folder.Open("sfx/" + soundtrack + ".wav")
+	return GetSfx(soundtrack, true)
+}
+
+func GetSfx(name string, infinite bool) (*audio.Player, error) {
+	reader, err := folder.Open("sfx/" + name + ".wav")
 	if err != nil {
 		return nil, err
 	}
@@ -71,31 +73,19 @@ func GetBackgroundMusic(soundtrack string) (*audio.Player, error) {
 		}
 	}
 
-	s := audio.NewInfiniteLoop(stream, stream.Length())
-	player, err := audioContext.NewPlayer(s)
+	player, err := audioContext.NewPlayer(stream)
 	if err != nil {
 		return nil, err
 	}
-	return player, nil
-}
 
-// A simple wrapper type that embeds *bytes.Reader and adds a no-op Close method.
-// By embedding *bytes.Reader, it automatically satisfies the io.Reader and io.Seeker interfaces.
-type ByteReadSeekCloser struct {
-	*bytes.Reader
-}
-
-// Close satisfies the io.Closer interface.
-func (b ByteReadSeekCloser) Close() error {
-	// No resources to clean up for an in-memory byte array, so we return nil.
-	return nil
-}
-
-// NewReadSeekCloser creates an io.ReadSeekCloser from a byte slice.
-func NewReadSeekCloser(data []byte) io.ReadSeekCloser {
-	return ByteReadSeekCloser{
-		Reader: bytes.NewReader(data),
+	if infinite {
+		s := audio.NewInfiniteLoop(stream, stream.Length())
+		player, err = audioContext.NewPlayer(s)
+		if err != nil {
+			return nil, err
+		}
 	}
+	return player, nil
 }
 
 func GetMapTiles(name string) ([15][20]int, error) {
